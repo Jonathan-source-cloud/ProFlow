@@ -583,25 +583,263 @@
         }
 
         // ==================== EMAIL CONNECTION ====================
+        const GMAIL_CLIENT_ID = '96345626591-c0h54kk46sarev8222d2f7l06t6cgg1k.apps.googleusercontent.com';
+        const GMAIL_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly';
+        
         async function connectEmail() {
-            // Gmail OAuth 2.0 Flow (Simplified for demo)
-            const CLIENT_ID = 'YOUR_GMAIL_CLIENT_ID'; // User needs to set this up
-            const REDIRECT_URI = window.location.origin;
-            const SCOPE = 'https://www.googleapis.com/auth/gmail.readonly';
+            // Start real Gmail OAuth flow
+            const redirectUri = window.location.origin + window.location.pathname;
             
-            alert('🔧 E-Mail-Verbindung Setup:\n\n' +
-                  '1. Gmail API aktivieren:\n' +
-                  '   - Gehe zu console.cloud.google.com\n' +
-                  '   - Erstelle ein Projekt\n' +
-                  '   - Aktiviere Gmail API\n' +
-                  '   - Erstelle OAuth 2.0 Credentials\n\n' +
-                  '2. Outlook alternativ:\n' +
-                  '   - Verwende Microsoft Graph API\n' +
-                  '   - Portal.azure.com für App Registration\n\n' +
-                  'Für diese Demo simuliere ich E-Mails...');
+            const authUrl = 'https://accounts.google.com/o/oauth2/v2/auth?' +
+                'client_id=' + encodeURIComponent(GMAIL_CLIENT_ID) +
+                '&redirect_uri=' + encodeURIComponent(redirectUri) +
+                '&response_type=token' +
+                '&scope=' + encodeURIComponent(GMAIL_SCOPE) +
+                '&include_granted_scopes=true' +
+                '&prompt=consent';
             
-            // Simulate email connection with demo data
-            simulateEmailConnection();
+            // Open OAuth popup
+            const popup = window.open(authUrl, 'gmail-oauth', 
+                'width=500,height=600,scrollbars=yes,resizable=yes');
+            
+            // Check for token in popup URL
+            const checkPopup = setInterval(() => {
+                try {
+                    if (!popup || popup.closed) {
+                        clearInterval(checkPopup);
+                        return;
+                    }
+                    
+                    const popupUrl = popup.location.href;
+                    
+                    if (popupUrl.includes('access_token=')) {
+                        clearInterval(checkPopup);
+                        popup.close();
+                        
+                        // Extract token from URL fragment
+                        const hash = popupUrl.split('#')[1];
+                        const params = new URLSearchParams(hash);
+                        const accessToken = params.get('access_token');
+                        
+                        if (accessToken) {
+                            handleGmailToken(accessToken);
+                        }
+                    }
+                } catch (e) {
+                    // Cross-origin — popup not on same origin yet, keep waiting
+                }
+            }, 500);
+        }
+        
+        async function handleGmailToken(accessToken) {
+            try {
+                // Get user's email address first
+                const profileRes = await fetch(
+                    'https://www.googleapis.com/gmail/v1/users/me/profile',
+                    { headers: { 'Authorization': 'Bearer ' + accessToken } }
+                );
+                const profile = await profileRes.json();
+                const userEmail = profile.emailAddress;
+                
+                // Check if account already connected
+                const alreadyConnected = connectedEmailAccounts.find(a => a.email === userEmail);
+                if (alreadyConnected) {
+                    // Update token
+                    alreadyConnected.accessToken = accessToken;
+                    alreadyConnected.connected = true;
+                } else {
+                    // Add new account
+                    connectedEmailAccounts.push({
+                        email: userEmail,
+                        type: 'gmail',
+                        connected: true,
+                        accessToken: accessToken,
+                        addedAt: new Date().toISOString()
+                    });
+                }
+                
+                await saveData();
+                emailConnected = true;
+                updateConnectionStatus();
+                renderEmailAccounts();
+                
+                // Fetch emails
+                showLoadingMessage('Fetching emails from ' + userEmail + '...');
+                await fetchGmailEmails(accessToken, userEmail);
+                hideLoadingMessage();
+                
+                renderDashboard();
+                renderEmailViews();
+                checkOpportunities();
+                updateStats();
+                
+                alert('✅ Successfully connected ' + userEmail + '!\n\nYour emails have been loaded.');
+                
+            } catch (error) {
+                hideLoadingMessage();
+                alert('Error connecting Gmail: ' + error.message);
+            }
+        }
+        
+        function showLoadingMessage(msg) {
+            const existing = document.getElementById('loadingOverlay');
+            if (existing) existing.remove();
+            
+            const overlay = document.createElement('div');
+            overlay.id = 'loadingOverlay';
+            overlay.style.cssText = `
+                position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+                display: flex; align-items: center; justify-content: center;
+                z-index: 9999; backdrop-filter: blur(4px);
+            `;
+            overlay.innerHTML = `
+                <div style="background: #1e293b; border: 1px solid rgba(255,255,255,0.1); 
+                            border-radius: 1rem; padding: 2rem; text-align: center; max-width: 300px;">
+                    <div style="border: 3px solid rgba(45,212,191,0.1); border-top: 3px solid #2DD4BF;
+                                border-radius: 50%; width: 40px; height: 40px; 
+                                animation: spin 1s linear infinite; margin: 0 auto 1rem;"></div>
+                    <div style="color: #2DD4BF; font-family: 'Space Mono', monospace; font-size: 0.9rem;">
+                        ${msg}
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+        }
+        
+        function hideLoadingMessage() {
+            const overlay = document.getElementById('loadingOverlay');
+            if (overlay) overlay.remove();
+        }
+        
+        async function fetchGmailEmails(accessToken, accountEmail) {
+            try {
+                // Fetch list of messages (last 50)
+                const listRes = await fetch(
+                    'https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=50&q=in:inbox',
+                    { headers: { 'Authorization': 'Bearer ' + accessToken } }
+                );
+                const listData = await listRes.json();
+                
+                if (!listData.messages) return;
+                
+                // Fetch each message (in parallel batches of 10)
+                const messages = listData.messages;
+                const batchSize = 10;
+                
+                for (let i = 0; i < messages.length; i += batchSize) {
+                    const batch = messages.slice(i, i + batchSize);
+                    
+                    const emailPromises = batch.map(msg =>
+                        fetch(
+                            `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=full`,
+                            { headers: { 'Authorization': 'Bearer ' + accessToken } }
+                        ).then(r => r.json())
+                    );
+                    
+                    const emailData = await Promise.all(emailPromises);
+                    
+                    emailData.forEach(email => {
+                        // Skip if already in list
+                        if (window.appData.emails.find(e => e.id === email.id)) return;
+                        
+                        const processed = processGmailMessage(email, accountEmail);
+                        if (processed) window.appData.emails.push(processed);
+                    });
+                }
+                
+                await saveData();
+                
+            } catch (error) {
+                console.error('Error fetching emails:', error);
+                throw error;
+            }
+        }
+        
+        function processGmailMessage(gmailMsg, accountEmail) {
+            try {
+                const headers = gmailMsg.payload.headers;
+                const getHeader = name => headers.find(h => h.name.toLowerCase() === name.toLowerCase())?.value || '';
+                
+                const from = getHeader('From');
+                const subject = getHeader('Subject') || '(No subject)';
+                const date = getHeader('Date');
+                const to = getHeader('To');
+                
+                // Extract email body
+                let body = '';
+                
+                function extractBody(payload) {
+                    if (payload.body && payload.body.data) {
+                        try {
+                            return atob(payload.body.data.replace(/-/g, '+').replace(/_/g, '/'));
+                        } catch(e) { return ''; }
+                    }
+                    if (payload.parts) {
+                        for (const part of payload.parts) {
+                            if (part.mimeType === 'text/plain') {
+                                try {
+                                    return atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/'));
+                                } catch(e) {}
+                            }
+                        }
+                        for (const part of payload.parts) {
+                            const result = extractBody(part);
+                            if (result) return result;
+                        }
+                    }
+                    return '';
+                }
+                
+                body = extractBody(gmailMsg.payload);
+                
+                // Clean body text
+                body = body.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+                
+                const snippet = gmailMsg.snippet || body.substring(0, 150);
+                const isUnread = gmailMsg.labelIds?.includes('UNREAD') ?? false;
+                const isImportant = gmailMsg.labelIds?.includes('IMPORTANT') ?? false;
+                
+                // Auto-categorize
+                const text = (subject + ' ' + body).toLowerCase();
+                let category = 'other';
+                for (const [cat, keywords] of Object.entries(EMAIL_CATEGORIES)) {
+                    if (cat === 'other') continue;
+                    if (keywords.some(k => text.includes(k))) {
+                        category = cat;
+                        break;
+                    }
+                }
+                
+                // Detect language
+                const germanWords = ['der', 'die', 'das', 'und', 'ist', 'nicht', 'mit', 'von', 'für'];
+                const wordList = text.split(/\s+/);
+                const germanCount = wordList.filter(w => germanWords.includes(w)).length;
+                const language = germanCount > 3 ? 'de' : 'en';
+                
+                // Check for opportunities
+                const oppKeywords = ['sign up', 'registration', 'register', 'first come', 'limited spots', 'deadline', 'apply now'];
+                const hasOpportunity = oppKeywords.some(k => text.includes(k));
+                
+                return {
+                    id: gmailMsg.id,
+                    from: from,
+                    subject: subject,
+                    snippet: snippet.substring(0, 200),
+                    date: date ? new Date(date).toISOString() : new Date().toISOString(),
+                    read: !isUnread,
+                    important: isImportant,
+                    category: category,
+                    content: body || snippet,
+                    language: language,
+                    hasOpportunity: hasOpportunity,
+                    opportunityType: hasOpportunity ? 'deadline-48h' : null,
+                    account: accountEmail
+                };
+                
+            } catch (error) {
+                console.error('Error processing email:', error);
+                return null;
+            }
         }
 
         function simulateEmailConnection() {
@@ -859,20 +1097,30 @@ This is a demo - use "Add Demo Account" to test the multi-account feature!`);
         async function syncEmailAccount(index) {
             const account = connectedEmailAccounts[index];
             
-            if (!account.connected) {
-                alert('Account is disconnected. Please reconnect.');
+            if (!account.connected || !account.accessToken) {
+                // Re-authenticate
+                alert('Session expired. Please reconnect this account.');
+                connectEmail();
                 return;
             }
             
-            alert(`🔄 Syncing emails for ${account.email}...
-
-In a real implementation, this would:
-1. Use the stored access token
-2. Fetch new emails from the API
-3. Add them to window.appData.emails
-4. Categorize and process them
-
-For now, this is a demo feature.`);
+            showLoadingMessage('Syncing ' + account.email + '...');
+            
+            try {
+                await fetchGmailEmails(account.accessToken, account.email);
+                hideLoadingMessage();
+                renderDashboard();
+                renderEmailViews();
+                updateStats();
+                alert('✅ Synced ' + account.email + ' successfully!');
+            } catch (error) {
+                hideLoadingMessage();
+                // Token likely expired — ask to reconnect
+                account.connected = false;
+                await saveData();
+                renderEmailAccounts();
+                alert('Session expired for ' + account.email + '. Please click "Connect Email" to reconnect.');
+            }
         }
 
         // ==================== DASHBOARD ====================
