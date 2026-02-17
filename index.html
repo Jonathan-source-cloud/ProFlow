@@ -1,0 +1,2232 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ProFlow - Intelligent Productivity App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Crimson+Pro:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2DD4BF;
+            --secondary: #F59E0B;
+            --danger: #EF4444;
+            --dark: #0F172A;
+            --light: #F8FAFC;
+        }
+        
+        body {
+            font-family: 'Crimson Pro', serif;
+            background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+            color: var(--light);
+        }
+        
+        .font-mono {
+            font-family: 'Space Mono', monospace;
+        }
+        
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .tab-active {
+            background: var(--primary);
+            color: var(--dark);
+            font-weight: 700;
+        }
+        
+        .email-card {
+            transition: all 0.3s ease;
+            border-left: 4px solid transparent;
+        }
+        
+        .email-card:hover {
+            transform: translateX(5px);
+            border-left-color: var(--primary);
+        }
+        
+        .email-unread {
+            border-left-color: var(--secondary);
+            background: rgba(245, 158, 11, 0.1);
+        }
+        
+        .email-important {
+            border-left-color: var(--danger);
+            background: rgba(239, 68, 68, 0.1);
+        }
+        
+        .priority-high { border-left: 4px solid var(--danger); }
+        .priority-medium { border-left: 4px solid var(--secondary); }
+        .priority-low { border-left: 4px solid var(--primary); }
+        
+        .category-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            background: rgba(45, 212, 191, 0.2);
+            color: var(--primary);
+            font-family: 'Space Mono', monospace;
+        }
+        
+        .notification-badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background: var(--danger);
+            color: white;
+            border-radius: 9999px;
+            width: 20px;
+            height: 20px;
+            font-size: 0.7rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .btn-primary {
+            background: var(--primary);
+            color: var(--dark);
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 700;
+            transition: all 0.3s;
+            font-family: 'Space Mono', monospace;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(45, 212, 191, 0.3);
+        }
+        
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+        
+        .status-connected {
+            background: rgba(45, 212, 191, 0.2);
+            color: var(--primary);
+        }
+        
+        .status-disconnected {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--danger);
+        }
+        
+        .loading-spinner {
+            border: 3px solid rgba(45, 212, 191, 0.1);
+            border-top: 3px solid var(--primary);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        input, textarea, select {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--light);
+            border-radius: 0.5rem;
+            padding: 0.75rem;
+        }
+        
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: var(--primary);
+            background: rgba(255, 255, 255, 0.08);
+        }
+        
+        .calendar-day {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .calendar-day:hover {
+            background: rgba(45, 212, 191, 0.2);
+        }
+        
+        .calendar-today {
+            background: var(--primary);
+            color: var(--dark);
+            font-weight: 700;
+        }
+        
+        .calendar-has-tasks {
+            position: relative;
+        }
+        
+        .calendar-has-tasks::after {
+            content: '';
+            position: absolute;
+            bottom: 5px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: var(--secondary);
+        }
+    </style>
+</head>
+<body class="min-h-screen p-6">
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <header class="glass-effect rounded-2xl p-6 mb-6">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h1 class="text-4xl font-bold mb-2 font-mono" style="color: var(--primary);">ProFlow</h1>
+                    <p class="text-gray-400">Intelligent Email & Task Management</p>
+                </div>
+                <div class="flex gap-4 items-center">
+                    <div id="emailConnectionStatus" class="connection-status status-disconnected">
+                        <span id="statusIndicator">●</span>
+                        <span id="statusText">Not Connected</span>
+                    </div>
+                    <button onclick="connectEmail()" class="btn-primary text-sm">
+                        📧 Connect Email
+                    </button>
+                    <div class="relative">
+                        <button onclick="showNotifications()" class="text-2xl">
+                            🔔
+                        </button>
+                        <span id="notificationBadge" class="notification-badge hidden">0</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Tabs -->
+        <nav class="glass-effect rounded-2xl p-2 mb-6 flex gap-2">
+            <button onclick="switchTab('dashboard')" id="tab-dashboard" class="tab-active flex-1 py-3 px-6 rounded-xl font-mono text-sm">
+                📊 DASHBOARD
+            </button>
+            <button onclick="switchTab('emails')" id="tab-emails" class="flex-1 py-3 px-6 rounded-xl font-mono text-sm hover:bg-white/5">
+                📧 E-MAILS
+            </button>
+            <button onclick="switchTab('tasks')" id="tab-tasks" class="flex-1 py-3 px-6 rounded-xl font-mono text-sm hover:bg-white/5">
+                ✅ AUFGABEN
+            </button>
+            <button onclick="switchTab('ideas')" id="tab-ideas" class="flex-1 py-3 px-6 rounded-xl font-mono text-sm hover:bg-white/5">
+                💡 IDEEN
+            </button>
+        </nav>
+
+        <!-- Dashboard Tab -->
+        <div id="content-dashboard" class="space-y-6">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Daily Email Overview -->
+                <div class="glass-effect rounded-2xl p-6 md:col-span-2">
+                    <h2 class="text-2xl font-bold mb-4 font-mono" style="color: var(--primary);">Today's Emails</h2>
+                    <div id="todayEmailOverview" class="space-y-3"></div>
+                </div>
+                
+                <!-- Quick Stats -->
+                <div class="glass-effect rounded-2xl p-6">
+                    <h2 class="text-2xl font-bold mb-4 font-mono" style="color: var(--primary);">Statistics</h2>
+                    <div class="space-y-4">
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-400">Open Tasks</span>
+                            <span id="statTasks" class="text-2xl font-bold" style="color: var(--primary);">0</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-400">Urgent Deadlines</span>
+                            <span id="statUrgent" class="text-2xl font-bold" style="color: var(--danger);">0</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-gray-400">Upcoming Opportunities</span>
+                            <span id="statOpportunities" class="text-2xl font-bold" style="color: var(--secondary);">0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Opportunities Alert -->
+            <div id="opportunitiesAlert" class="glass-effect rounded-2xl p-6 border-2 border-orange-500 hidden">
+                <h2 class="text-2xl font-bold mb-4 font-mono text-orange-400">⚡ Upcoming Opportunities</h2>
+                <div id="opportunitiesList" class="space-y-3"></div>
+            </div>
+        </div>
+
+        <!-- Emails Tab -->
+        <div id="content-emails" class="space-y-6 hidden">
+            <!-- Email Accounts Management -->
+            <div class="glass-effect rounded-2xl p-6">
+                <h2 class="text-2xl font-bold mb-4 font-mono" style="color: var(--primary);">Email Accounts</h2>
+                
+                <div id="connectedAccounts" class="mb-4 space-y-2"></div>
+                
+                <button onclick="addEmailAccount()" class="btn-primary text-sm">
+                    ➕ Add Email Account
+                </button>
+            </div>
+            
+            <!-- Email Archives Register -->
+            <div class="glass-effect rounded-2xl p-6">
+                <h2 class="text-2xl font-bold mb-4 font-mono" style="color: var(--primary);">Email Archives</h2>
+                
+                <!-- Search Bar -->
+                <div class="mb-4">
+                    <input type="text" id="emailSearchInput" 
+                           placeholder="🔍 Search emails by sender, subject, or content..." 
+                           class="w-full"
+                           onkeyup="searchEmails()">
+                </div>
+                
+                <!-- Category Filter Chips -->
+                <div class="flex gap-2 mb-6 overflow-x-auto pb-2">
+                    <button onclick="filterByCategory('all')" id="cat-all" class="px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 text-xs font-mono whitespace-nowrap">
+                        All
+                    </button>
+                    <button onclick="filterByCategory('academic')" id="cat-academic" class="px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 text-xs font-mono whitespace-nowrap">
+                        📚 Academic
+                    </button>
+                    <button onclick="filterByCategory('activities')" id="cat-activities" class="px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 text-xs font-mono whitespace-nowrap">
+                        🎯 Activities
+                    </button>
+                    <button onclick="filterByCategory('administrative')" id="cat-administrative" class="px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 text-xs font-mono whitespace-nowrap">
+                        📋 Administrative
+                    </button>
+                    <button onclick="filterByCategory('social')" id="cat-social" class="px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 text-xs font-mono whitespace-nowrap">
+                        🎉 Social
+                    </button>
+                    <button onclick="filterByCategory('opportunities')" id="cat-opportunities" class="px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 text-xs font-mono whitespace-nowrap">
+                        ⚡ Opportunities
+                    </button>
+                    <button onclick="filterByCategory('personal')" id="cat-personal" class="px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 text-xs font-mono whitespace-nowrap">
+                        👤 Personal
+                    </button>
+                </div>
+                
+                <!-- Archive Navigation -->
+                <div class="flex gap-2 mb-6 overflow-x-auto">
+                    <button onclick="showEmailView('archives')" id="view-archives" class="btn-primary text-xs">
+                        📅 Daily Archives
+                    </button>
+                    <button onclick="showEmailView('account')" id="view-account" class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-mono">
+                        📬 Email Account
+                    </button>
+                    <button onclick="showEmailView('sender')" id="view-sender" class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-mono">
+                        👤 Sender
+                    </button>
+                    <button onclick="showEmailView('date')" id="view-date" class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-mono">
+                        📆 Date
+                    </button>
+                    <button onclick="showEmailView('category')" id="view-category" class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-mono">
+                        🏷️ Category
+                    </button>
+                </div>
+
+                <!-- Email Views -->
+                <div id="emailViewContainer"></div>
+            </div>
+
+            <!-- Email Actions -->
+            <div class="glass-effect rounded-2xl p-6">
+                <h2 class="text-2xl font-bold mb-4 font-mono" style="color: var(--primary);">Email Actions</h2>
+                <div id="selectedEmailsInfo" class="mb-4 text-gray-400 text-sm">
+                    Select emails to perform actions
+                </div>
+                <div class="flex gap-4">
+                    <button onclick="bulkAction('draft')" class="btn-primary text-sm">
+                        ✍️ Draft Reply
+                    </button>
+                    <button onclick="bulkAction('extract')" class="btn-primary text-sm">
+                        📋 Extract Tasks
+                    </button>
+                    <button onclick="bulkAction('important')" class="btn-primary text-sm">
+                        ⭐ Mark Important
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tasks Tab -->
+        <div id="content-tasks" class="space-y-6 hidden">
+            <!-- New Task Form -->
+            <div class="glass-effect rounded-2xl p-6">
+                <h2 class="text-2xl font-bold mb-4 font-mono" style="color: var(--primary);">New Task</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <input type="text" id="taskTitle" placeholder="Task Title" class="w-full">
+                    <div class="flex gap-2">
+                        <input type="date" id="taskDeadlineDate" class="flex-1">
+                        <input type="time" id="taskDeadlineTime" class="flex-1">
+                    </div>
+                    <select id="taskPriority" class="w-full">
+                        <option value="low">🟢 Low Priority</option>
+                        <option value="medium" selected>🟡 Medium Priority</option>
+                        <option value="high">🔴 High Priority</option>
+                    </select>
+                    <input type="text" id="taskCategory" placeholder="Category" class="w-full">
+                    <div class="md:col-span-2">
+                        <label class="block mb-2 text-sm text-gray-400">Reminder (minutes before)</label>
+                        <input type="number" id="taskReminder" placeholder="e.g. 15, 30, 60" class="w-full">
+                    </div>
+                    <textarea id="taskNotes" placeholder="Notes..." class="w-full md:col-span-2 h-24"></textarea>
+                </div>
+                <button onclick="addTask()" class="btn-primary mt-4">
+                    ➕ ADD TASK
+                </button>
+            </div>
+
+            <!-- Tasks List -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2 space-y-4">
+                    <div class="flex gap-2">
+                        <button onclick="filterTasks('all')" id="filter-all" class="btn-primary text-xs">All</button>
+                        <button onclick="filterTasks('active')" id="filter-active" class="px-4 py-2 rounded-lg bg-white/5 text-xs font-mono">Active</button>
+                        <button onclick="filterTasks('completed')" id="filter-completed" class="px-4 py-2 rounded-lg bg-white/5 text-xs font-mono">Completed</button>
+                    </div>
+                    <div id="tasksList" class="space-y-3"></div>
+                </div>
+
+                <!-- Calendar & Reminders -->
+                <div class="space-y-4">
+                    <div class="glass-effect rounded-2xl p-4">
+                        <h3 class="font-bold mb-4 font-mono" style="color: var(--primary);">Calendar</h3>
+                        <div id="miniCalendar"></div>
+                    </div>
+                    <div class="glass-effect rounded-2xl p-4">
+                        <h3 class="font-bold mb-4 font-mono" style="color: var(--primary);">Upcoming</h3>
+                        <div id="upcomingDeadlines"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ideas Tab -->
+        <div id="content-ideas" class="space-y-6 hidden">
+            <div class="glass-effect rounded-2xl p-6">
+                <h2 class="text-2xl font-bold mb-4 font-mono" style="color: var(--primary);">New Idea / Project</h2>
+                <input type="text" id="ideaTitle" class="w-full mb-4" placeholder="Title">
+                <select id="ideaCategory" class="w-full mb-4">
+                    <option value="">Choose category...</option>
+                    <option value="projekt">🚀 Project</option>
+                    <option value="idee">💡 Idea</option>
+                    <option value="notiz">📝 Note</option>
+                    <option value="recherche">🔍 Research</option>
+                </select>
+                
+                <div class="mb-4 flex gap-2 border-b border-white/10 pb-2">
+                    <button onclick="formatText('bold')" class="px-3 py-1 rounded hover:bg-white/10 font-bold">B</button>
+                    <button onclick="formatText('italic')" class="px-3 py-1 rounded hover:bg-white/10 italic">I</button>
+                    <button onclick="formatText('insertUnorderedList')" class="px-3 py-1 rounded hover:bg-white/10">• List</button>
+                </div>
+                
+                <div id="ideaContent" contenteditable="true" class="w-full min-h-[200px] mb-4 p-4 rounded-lg bg-white/5"></div>
+                
+                <button onclick="saveIdea()" class="btn-primary">
+                    💾 SAVE
+                </button>
+            </div>
+
+            <div class="glass-effect rounded-2xl p-6">
+                <h3 class="text-2xl font-bold mb-4 font-mono" style="color: var(--primary);">Saved Ideas</h3>
+                <div class="flex gap-2 mb-4">
+                    <button onclick="filterIdeas('all')" id="idea-filter-all" class="btn-primary text-xs">All</button>
+                    <button onclick="filterIdeas('projekt')" id="idea-filter-projekt" class="px-4 py-2 rounded-lg bg-white/5 text-xs font-mono">Projects</button>
+                    <button onclick="filterIdeas('idee')" id="idea-filter-idee" class="px-4 py-2 rounded-lg bg-white/5 text-xs font-mono">Ideas</button>
+                    <button onclick="filterIdeas('notiz')" id="idea-filter-notiz" class="px-4 py-2 rounded-lg bg-white/5 text-xs font-mono">Notes</button>
+                </div>
+                <div id="ideasList" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+            </div>
+        </div>
+
+        <!-- Notification Modal -->
+        <div id="notificationModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+            <div class="glass-effect rounded-2xl p-6 max-w-2xl w-full m-4 max-h-[80vh] overflow-y-auto">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-bold font-mono" style="color: var(--primary);">Notifications</h2>
+                    <button onclick="closeNotifications()" class="text-2xl hover:text-red-500">×</button>
+                </div>
+                <div id="notificationsList"></div>
+            </div>
+        </div>
+
+        <!-- Email Viewer Modal -->
+        <div id="emailViewerModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+            <div class="glass-effect rounded-2xl p-6 max-w-4xl w-full m-4 max-h-[85vh] overflow-y-auto">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-bold font-mono" style="color: var(--primary);">Email</h2>
+                    <button onclick="closeEmailViewer()" class="text-2xl hover:text-red-500">×</button>
+                </div>
+                <div id="emailViewerContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== GLOBAL STATE ====================
+        let currentTab = 'dashboard';
+        let currentEmailView = 'archives';
+        let currentTaskFilter = 'all';
+        let currentIdeaFilter = 'all';
+        let selectedEmails = new Set();
+        let emailConnected = false;
+        let gmailAccessToken = null;
+        let emailSearchQuery = '';
+        let emailCategoryFilter = 'all';
+        let calendarMonth = new Date().getMonth();
+        let calendarYear = new Date().getFullYear();
+        let connectedEmailAccounts = []; // Store multiple email accounts
+
+        // Email Categories for IB students at Pearson College UWC
+        const EMAIL_CATEGORIES = {
+            academic: ['assignment', 'homework', 'test', 'exam', 'grade', 'class', 'course', 'study', 'ib', 'cas', 'tok', 'ee'],
+            activities: ['activity', 'sign up', 'registration', 'event', 'club', 'meeting', 'workshop', 'session', 'volunteer'],
+            administrative: ['announcement', 'notice', 'reminder', 'deadline', 'form', 'permission', 'document'],
+            social: ['party', 'gathering', 'social', 'weekend', 'trip', 'outing'],
+            opportunities: ['opportunity', 'scholarship', 'competition', 'application', 'internship', 'program'],
+            personal: ['friend', 'family', 'personal'],
+            other: []
+        };
+
+        // ==================== INITIALIZATION ====================
+        async function initApp() {
+            await loadData();
+            checkEmailConnection();
+            renderDashboard();
+            renderEmailViews();
+            renderTasks();
+            renderIdeas();
+            renderMiniCalendar();
+            updateStats();
+            checkOpportunities();
+            startReminderSystem();
+        }
+
+        // ==================== STORAGE FUNCTIONS ====================
+        async function loadData() {
+            try {
+                window.appData = { emails: [], tasks: [], ideas: [], notifications: [] };
+                
+                const emailsData = await window.storage.get('emails-v2', true);
+                if (emailsData) window.appData.emails = JSON.parse(emailsData.value);
+                
+                const tasksData = await window.storage.get('tasks-v2', true);
+                if (tasksData) window.appData.tasks = JSON.parse(tasksData.value);
+                
+                const ideasData = await window.storage.get('ideas', true);
+                if (ideasData) window.appData.ideas = JSON.parse(ideasData.value);
+                
+                const notifData = await window.storage.get('notifications', true);
+                if (notifData) window.appData.notifications = JSON.parse(notifData.value);
+                
+                const accountsData = await window.storage.get('email-accounts', true);
+                if (accountsData) connectedEmailAccounts = JSON.parse(accountsData.value);
+            } catch (error) {
+                window.appData = { emails: [], tasks: [], ideas: [], notifications: [] };
+                connectedEmailAccounts = [];
+            }
+        }
+
+        async function saveData() {
+            try {
+                await window.storage.set('emails-v2', JSON.stringify(window.appData.emails), true);
+                await window.storage.set('tasks-v2', JSON.stringify(window.appData.tasks), true);
+                await window.storage.set('ideas', JSON.stringify(window.appData.ideas), true);
+                await window.storage.set('notifications', JSON.stringify(window.appData.notifications), true);
+                await window.storage.set('email-accounts', JSON.stringify(connectedEmailAccounts), true);
+            } catch (error) {
+                console.error('Speicherfehler:', error);
+            }
+        }
+
+        // ==================== TAB SWITCHING ====================
+        function switchTab(tab) {
+            currentTab = tab;
+            ['dashboard', 'emails', 'tasks', 'ideas'].forEach(t => {
+                document.getElementById(`content-${t}`).classList.add('hidden');
+                const btn = document.getElementById(`tab-${t}`);
+                btn.classList.remove('tab-active');
+                btn.classList.add('hover:bg-white/5');
+            });
+            document.getElementById(`content-${tab}`).classList.remove('hidden');
+            const activeBtn = document.getElementById(`tab-${tab}`);
+            activeBtn.classList.add('tab-active');
+            activeBtn.classList.remove('hover:bg-white/5');
+            
+            if (tab === 'dashboard') renderDashboard();
+            if (tab === 'emails') {
+                renderEmailAccounts();
+                renderEmailViews();
+            }
+            if (tab === 'tasks') renderTasks();
+            if (tab === 'ideas') renderIdeas();
+        }
+
+        // ==================== EMAIL CONNECTION ====================
+        async function connectEmail() {
+            // Gmail OAuth 2.0 Flow (Simplified for demo)
+            const CLIENT_ID = 'YOUR_GMAIL_CLIENT_ID'; // User needs to set this up
+            const REDIRECT_URI = window.location.origin;
+            const SCOPE = 'https://www.googleapis.com/auth/gmail.readonly';
+            
+            alert('🔧 E-Mail-Verbindung Setup:\n\n' +
+                  '1. Gmail API aktivieren:\n' +
+                  '   - Gehe zu console.cloud.google.com\n' +
+                  '   - Erstelle ein Projekt\n' +
+                  '   - Aktiviere Gmail API\n' +
+                  '   - Erstelle OAuth 2.0 Credentials\n\n' +
+                  '2. Outlook alternativ:\n' +
+                  '   - Verwende Microsoft Graph API\n' +
+                  '   - Portal.azure.com für App Registration\n\n' +
+                  'Für diese Demo simuliere ich E-Mails...');
+            
+            // Simulate email connection with demo data
+            simulateEmailConnection();
+        }
+
+        function simulateEmailConnection() {
+            emailConnected = true;
+            updateConnectionStatus();
+            
+            // Create demo emails
+            const demoEmails = [
+                {
+                    id: 'email-1',
+                    from: 'ib.coordinator@pearsoncollege.ca',
+                    subject: 'CAS Reflection Deadline - 48 Hours',
+                    snippet: 'Reminder: Your CAS reflection for this term is due in 48 hours. Please submit via ManageBac.',
+                    date: new Date().toISOString(),
+                    read: false,
+                    important: false,
+                    category: 'academic',
+                    content: 'Dear Students, This is a reminder that your CAS reflection for this term is due in 48 hours. Please ensure you submit it via ManageBac by Friday at 5 PM. Best regards, IB Coordinator',
+                    language: 'en',
+                    hasOpportunity: false,
+                    account: 'student@pearsoncollege.ca'
+                },
+                {
+                    id: 'email-2',
+                    from: 'activities@pearsoncollege.ca',
+                    subject: 'Kayaking Trip Sign-Up - First Come First Serve!',
+                    snippet: 'Join us for a kayaking adventure this weekend! Limited spots available. Sign up now!',
+                    date: new Date(Date.now() - 3600000).toISOString(),
+                    read: false,
+                    important: false,
+                    category: 'activities',
+                    content: 'Hi everyone! We are organizing a kayaking trip to Sooke Harbour this Saturday. This is first-come, first-serve with only 12 spots available. Sign up here: [link]. Deadline: Tomorrow 6 PM.',
+                    language: 'en',
+                    hasOpportunity: true,
+                    opportunityDeadline: new Date(Date.now() + 36 * 3600000).toISOString(),
+                    opportunityType: 'first-come-first-serve',
+                    account: 'student@pearsoncollege.ca'
+                },
+                {
+                    id: 'email-3',
+                    from: 'scholarship@uwc.org',
+                    subject: 'UWC Scholarship Application - Deadline in 40 Hours',
+                    snippet: 'The UWC Davis Scholarship application deadline is approaching. Apply now!',
+                    date: new Date(Date.now() - 7200000).toISOString(),
+                    read: true,
+                    important: true,
+                    category: 'opportunities',
+                    content: 'Dear UWC Students, The Davis Scholarship for summer programs is now open. Deadline: 40 hours from now. Apply at: [link]',
+                    language: 'en',
+                    hasOpportunity: true,
+                    opportunityDeadline: new Date(Date.now() + 40 * 3600000).toISOString(),
+                    opportunityType: 'deadline-48h',
+                    account: 'personal@email.com'
+                },
+                {
+                    id: 'email-4',
+                    from: 'admin@pearsoncollege.ca',
+                    subject: 'Weekend Leave Form',
+                    snippet: 'Please submit your weekend leave form by Thursday.',
+                    date: new Date(Date.now() - 10800000).toISOString(),
+                    read: false,
+                    important: false,
+                    category: 'administrative',
+                    content: 'Dear Students, please remember to submit your weekend leave form by Thursday 6 PM. Thank you.',
+                    language: 'en',
+                    hasOpportunity: false,
+                    account: 'student@pearsoncollege.ca'
+                }
+            ];
+            
+            window.appData.emails = [...demoEmails, ...window.appData.emails];
+            saveData();
+            renderDashboard();
+            renderEmailViews();
+            checkOpportunities();
+            updateStats();
+        }
+
+        function updateConnectionStatus() {
+            const statusDiv = document.getElementById('emailConnectionStatus');
+            const indicator = document.getElementById('statusIndicator');
+            const text = document.getElementById('statusText');
+            
+            if (emailConnected) {
+                statusDiv.classList.remove('status-disconnected');
+                statusDiv.classList.add('status-connected');
+                indicator.textContent = '●';
+                text.textContent = 'Connected';
+            } else {
+                statusDiv.classList.remove('status-connected');
+                statusDiv.classList.add('status-disconnected');
+                indicator.textContent = '●';
+                text.textContent = 'Not Connected';
+            }
+        }
+
+        function checkEmailConnection() {
+            // Check if we have stored email data
+            emailConnected = window.appData.emails.length > 0 || connectedEmailAccounts.length > 0;
+            updateConnectionStatus();
+            renderEmailAccounts();
+        }
+        
+        // ==================== EMAIL ACCOUNT MANAGEMENT ====================
+        function renderEmailAccounts() {
+            const container = document.getElementById('connectedAccounts');
+            
+            if (connectedEmailAccounts.length === 0) {
+                container.innerHTML = '<p class="text-gray-400 text-sm">No email accounts connected yet</p>';
+                return;
+            }
+            
+            container.innerHTML = connectedEmailAccounts.map((account, index) => `
+                <div class="glass-effect rounded-lg p-4 flex justify-between items-center">
+                    <div class="flex items-center gap-3">
+                        <div class="text-2xl">${account.type === 'gmail' ? '📧' : account.type === 'outlook' ? '📨' : '✉️'}</div>
+                        <div>
+                            <div class="font-bold">${account.email}</div>
+                            <div class="text-sm text-gray-400">${account.type.charAt(0).toUpperCase() + account.type.slice(1)}</div>
+                        </div>
+                        <div class="connection-status ${account.connected ? 'status-connected' : 'status-disconnected'}">
+                            <span>${account.connected ? '●' : '●'}</span>
+                            <span>${account.connected ? 'Connected' : 'Disconnected'}</span>
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="syncEmailAccount(${index})" class="px-3 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-mono" ${account.connected ? '' : 'disabled'}>
+                            🔄 Sync
+                        </button>
+                        <button onclick="removeEmailAccount(${index})" class="px-3 py-1 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-xs font-mono text-red-400">
+                            Remove
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function addEmailAccount() {
+            const modal = document.getElementById('emailViewerModal');
+            const content = document.getElementById('emailViewerContent');
+            
+            content.innerHTML = `
+                <div class="space-y-4">
+                    <h3 class="text-2xl font-bold mb-4">Add Email Account</h3>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block mb-2 text-sm text-gray-400">Email Provider</label>
+                            <select id="emailProvider" class="w-full">
+                                <option value="gmail">Gmail</option>
+                                <option value="outlook">Outlook / Microsoft 365</option>
+                                <option value="other">Other (IMAP)</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block mb-2 text-sm text-gray-400">Email Address</label>
+                            <input type="email" id="emailAddress" placeholder="your.email@example.com" class="w-full">
+                        </div>
+                        
+                        <div class="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+                            <h4 class="font-bold mb-2">📋 Setup Instructions:</h4>
+                            <p class="text-sm text-gray-300 mb-2">For Gmail:</p>
+                            <ol class="text-sm text-gray-300 list-decimal list-inside space-y-1">
+                                <li>Go to <a href="https://console.cloud.google.com" target="_blank" class="text-cyan-400 hover:underline">Google Cloud Console</a></li>
+                                <li>Create OAuth 2.0 credentials</li>
+                                <li>Enable Gmail API</li>
+                                <li>Add your redirect URI</li>
+                            </ol>
+                            <p class="text-xs text-gray-400 mt-2">See SETUP-GUIDE.md for detailed instructions</p>
+                        </div>
+                        
+                        <div class="flex gap-3 pt-4 border-t border-white/10">
+                            <button onclick="connectNewEmailAccount()" class="btn-primary text-sm">
+                                Connect Account
+                            </button>
+                            <button onclick="addDemoEmailAccount()" class="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-sm font-mono">
+                                Add Demo Account (Testing)
+                            </button>
+                            <button onclick="closeEmailViewer()" class="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-sm font-mono">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            modal.classList.remove('hidden');
+        }
+        
+        function connectNewEmailAccount() {
+            const provider = document.getElementById('emailProvider').value;
+            const email = document.getElementById('emailAddress').value.trim();
+            
+            if (!email) {
+                alert('Please enter an email address');
+                return;
+            }
+            
+            // For now, show instructions - real OAuth would happen here
+            alert(`🔧 To connect ${email}:
+
+1. Set up OAuth credentials (see SETUP-GUIDE.md)
+2. For testing, use "Add Demo Account" button
+3. Real implementation requires:
+   - OAuth 2.0 flow
+   - API credentials
+   - Proper redirect handling
+
+This is a demo - use "Add Demo Account" to test the multi-account feature!`);
+        }
+        
+        async function addDemoEmailAccount() {
+            const email = document.getElementById('emailAddress').value.trim() || 'demo@example.com';
+            const provider = document.getElementById('emailProvider').value;
+            
+            const newAccount = {
+                email: email,
+                type: provider,
+                connected: true,
+                accessToken: 'demo-token',
+                addedAt: new Date().toISOString()
+            };
+            
+            connectedEmailAccounts.push(newAccount);
+            await saveData();
+            
+            closeEmailViewer();
+            renderEmailAccounts();
+            updateConnectionStatus();
+            
+            alert(`✅ Demo account added: ${email}\n\nIn a real setup, this would trigger OAuth flow and fetch emails.`);
+        }
+        
+        async function removeEmailAccount(index) {
+            const account = connectedEmailAccounts[index];
+            
+            if (confirm(`Remove email account ${account.email}?`)) {
+                // Optionally remove emails from this account
+                const removeEmails = confirm('Also remove all emails from this account?');
+                
+                if (removeEmails) {
+                    window.appData.emails = window.appData.emails.filter(e => e.account !== account.email);
+                }
+                
+                connectedEmailAccounts.splice(index, 1);
+                await saveData();
+                renderEmailAccounts();
+                updateConnectionStatus();
+                renderDashboard();
+                renderEmailViews();
+            }
+        }
+        
+        async function syncEmailAccount(index) {
+            const account = connectedEmailAccounts[index];
+            
+            if (!account.connected) {
+                alert('Account is disconnected. Please reconnect.');
+                return;
+            }
+            
+            alert(`🔄 Syncing emails for ${account.email}...
+
+In a real implementation, this would:
+1. Use the stored access token
+2. Fetch new emails from the API
+3. Add them to window.appData.emails
+4. Categorize and process them
+
+For now, this is a demo feature.`);
+        }
+
+        // ==================== DASHBOARD ====================
+        function renderDashboard() {
+            renderTodayEmails();
+            updateStats();
+        }
+
+        function renderTodayEmails() {
+            const container = document.getElementById('todayEmailOverview');
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            const todayEmails = window.appData.emails.filter(email => {
+                const emailDate = new Date(email.date);
+                emailDate.setHours(0, 0, 0, 0);
+                return emailDate.getTime() === today.getTime();
+            }).slice(0, 10);
+            
+            if (todayEmails.length === 0) {
+                container.innerHTML = '<p class="text-gray-400 text-sm">No emails today</p>';
+                return;
+            }
+            
+            container.innerHTML = todayEmails.map(email => {
+                const time = new Date(email.date).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+                return `
+                    <div class="email-card glass-effect rounded-lg p-4 ${email.read ? '' : 'email-unread'} ${email.important ? 'email-important' : ''}" 
+                         onclick="openEmail('${email.id}')">
+                        <div class="flex justify-between items-start mb-2">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="font-bold font-mono">${email.from}</span>
+                                    <span class="text-xs text-gray-400">${time}</span>
+                                </div>
+                                <div class="font-semibold text-lg mb-1">${email.subject}</div>
+                                <div class="text-sm text-gray-400">${email.snippet}</div>
+                            </div>
+                            <div class="flex gap-2 items-center">
+                                ${email.important ? '<span class="text-red-400">⭐</span>' : ''}
+                                ${!email.read ? '<span class="text-orange-400 text-xs font-bold">NEU</span>' : ''}
+                            </div>
+                        </div>
+                        <div class="flex gap-2 mt-2">
+                            <span class="category-badge">${getCategoryIcon(email.category)} ${getCategoryName(email.category)}</span>
+                            ${email.hasOpportunity ? '<span class="category-badge" style="background: rgba(239, 68, 68, 0.2); color: var(--danger);">⚡ Opportunity</span>' : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function getCategoryIcon(category) {
+            const icons = {
+                academic: '📚',
+                activities: '🎯',
+                administrative: '📋',
+                social: '🎉',
+                opportunities: '⚡',
+                personal: '👤',
+                other: '📄'
+            };
+            return icons[category] || '📄';
+        }
+
+        function getCategoryName(category) {
+            const names = {
+                academic: 'Academic',
+                activities: 'Activities',
+                administrative: 'Administrative',
+                social: 'Social',
+                opportunities: 'Opportunities',
+                personal: 'Personal',
+                other: 'Other'
+            };
+            return names[category] || 'Other';
+        }
+
+        function openEmail(emailId) {
+            const email = window.appData.emails.find(e => e.id === emailId);
+            if (!email) return;
+            
+            // Mark as read
+            email.read = true;
+            saveData();
+            
+            // Show email in modal viewer
+            const modal = document.getElementById('emailViewerModal');
+            const content = document.getElementById('emailViewerContent');
+            
+            content.innerHTML = `
+                <div class="space-y-4">
+                    <div class="border-b border-white/10 pb-4">
+                        <div class="flex justify-between items-start mb-2">
+                            <div>
+                                <h3 class="text-2xl font-bold mb-2">${email.subject}</h3>
+                                <div class="text-sm text-gray-400">
+                                    <div>From: <span class="text-white">${email.from}</span></div>
+                                    <div>Date: <span class="text-white">${new Date(email.date).toLocaleString('en-US')}</span></div>
+                                    ${email.account ? `<div>To: <span class="text-white">${email.account}</span></div>` : ''}
+                                </div>
+                            </div>
+                            <div class="flex gap-2">
+                                ${email.important ? '<span class="text-red-400 text-2xl">⭐</span>' : ''}
+                                ${email.hasOpportunity ? '<span class="text-orange-400 text-2xl">⚡</span>' : ''}
+                            </div>
+                        </div>
+                        <div class="flex gap-2 mt-3">
+                            <span class="category-badge text-xs">${getCategoryIcon(email.category)} ${getCategoryName(email.category)}</span>
+                            <span class="category-badge text-xs">🌐 ${email.language === 'de' ? 'German' : 'English'}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="prose prose-invert max-w-none">
+                        <div class="whitespace-pre-wrap text-gray-200">${email.content}</div>
+                    </div>
+                    
+                    <div class="flex gap-3 pt-4 border-t border-white/10">
+                        <button onclick="replyToEmail('${email.id}')" class="btn-primary text-sm">
+                            ✍️ Reply
+                        </button>
+                        <button onclick="extractTasksFromEmail('${email.id}')" class="btn-primary text-sm">
+                            📋 Extract Tasks
+                        </button>
+                        <button onclick="toggleImportant('${email.id}')" class="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-sm font-mono">
+                            ${email.important ? '⭐ Unmark' : '⭐ Mark Important'}
+                        </button>
+                        <button onclick="openInEmailApp('${email.from}', '${email.subject}')" class="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-sm font-mono">
+                            📧 Open in Mail App
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            modal.classList.remove('hidden');
+            
+            updateStats();
+            renderDashboard();
+        }
+        
+        function closeEmailViewer() {
+            document.getElementById('emailViewerModal').classList.add('hidden');
+        }
+        
+        function openInEmailApp(from, subject) {
+            window.location.href = `mailto:${from}?subject=Re: ${encodeURIComponent(subject)}`;
+        }
+        
+        async function replyToEmail(emailId) {
+            const email = window.appData.emails.find(e => e.id === emailId);
+            if (!email) return;
+            
+            alert('🤖 Drafting reply...');
+            
+            try {
+                const response = await fetch("https://api.anthropic.com/v1/messages", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        model: "claude-sonnet-4-20250514",
+                        max_tokens: 1000,
+                        messages: [{
+                            role: "user",
+                            content: `Draft a professional reply to this email in ${email.language === 'de' ? 'German' : 'English'}:
+
+From: ${email.from}
+Subject: ${email.subject}
+Content: ${email.content}
+
+Keep the same language as the original email.`
+                        }]
+                    })
+                });
+                
+                const data = await response.json();
+                const reply = data.content.find(c => c.type === 'text')?.text || 'No reply generated';
+                
+                addNotification({
+                    id: `draft-${email.id}-${Date.now()}`,
+                    type: 'draft',
+                    title: '✍️ Reply Draft Ready',
+                    message: `For: ${email.subject}`,
+                    content: reply,
+                    timestamp: new Date().toISOString()
+                });
+                
+                alert('✅ Reply draft created! Check notifications.');
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+        
+        async function extractTasksFromEmail(emailId) {
+            const email = window.appData.emails.find(e => e.id === emailId);
+            if (!email) return;
+            
+            alert('📋 Extracting tasks...');
+            
+            try {
+                const response = await fetch("https://api.anthropic.com/v1/messages", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        model: "claude-sonnet-4-20250514",
+                        max_tokens: 1000,
+                        messages: [{
+                            role: "user",
+                            content: `Extract all tasks, action items, and deadlines from this email. Return ONLY a JSON array of tasks with this structure:
+[{"title": "task name", "deadline": "YYYY-MM-DD", "priority": "high/medium/low", "notes": "details"}]
+
+Email:
+From: ${email.from}
+Subject: ${email.subject}
+Content: ${email.content}`
+                        }]
+                    })
+                });
+                
+                const data = await response.json();
+                const text = data.content.find(c => c.type === 'text')?.text || '[]';
+                const cleanText = text.replace(/```json|```/g, '').trim();
+                const extractedTasks = JSON.parse(cleanText);
+                
+                extractedTasks.forEach(task => {
+                    window.appData.tasks.push({
+                        id: Date.now() + Math.random(),
+                        title: task.title,
+                        deadline: task.deadline,
+                        deadlineTime: '',
+                        priority: task.priority || 'medium',
+                        category: 'From Email',
+                        notes: task.notes + `\n\nSource: ${email.subject}`,
+                        completed: false,
+                        reminder: null,
+                        createdAt: new Date().toISOString()
+                    });
+                });
+                
+                await saveData();
+                renderTasks();
+                alert(`✅ ${extractedTasks.length} task(s) extracted!`);
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+        
+        function toggleImportant(emailId) {
+            const email = window.appData.emails.find(e => e.id === emailId);
+            if (email) {
+                email.important = !email.important;
+                saveData();
+                closeEmailViewer();
+                renderDashboard();
+                renderEmailViews();
+            }
+        }
+
+        function updateStats() {
+            const openTasks = window.appData.tasks.filter(t => !t.completed).length;
+            const urgent = window.appData.tasks.filter(t => {
+                if (!t.deadline) return false;
+                const deadline = new Date(t.deadline);
+                const now = new Date();
+                return !t.completed && deadline - now < 48 * 3600000 && deadline > now;
+            }).length;
+            const opportunities = window.appData.emails.filter(e => e.hasOpportunity).length;
+            
+            document.getElementById('statTasks').textContent = openTasks;
+            document.getElementById('statUrgent').textContent = urgent;
+            document.getElementById('statOpportunities').textContent = opportunities;
+        }
+
+        // ==================== OPPORTUNITIES CHECKING ====================
+        function checkOpportunities() {
+            const now = new Date();
+            const opportunities = window.appData.emails.filter(email => {
+                if (!email.hasOpportunity) return false;
+                if (email.opportunityType === 'first-come-first-serve') return true;
+                if (email.opportunityDeadline) {
+                    const deadline = new Date(email.opportunityDeadline);
+                    const hoursLeft = (deadline - now) / 3600000;
+                    return hoursLeft > 0 && hoursLeft <= 48;
+                }
+                return false;
+            });
+            
+            if (opportunities.length > 0) {
+                showOpportunitiesAlert(opportunities);
+                
+                // Create notifications
+                opportunities.forEach(opp => {
+                    const notifId = `opp-${opp.id}`;
+                    if (!window.appData.notifications.find(n => n.id === notifId)) {
+                        addNotification({
+                            id: notifId,
+                            type: 'opportunity',
+                            title: '⚡ Upcoming Opportunity',
+                            message: opp.subject,
+                            email: opp,
+                            timestamp: new Date().toISOString()
+                        });
+                    }
+                });
+            } else {
+                document.getElementById('opportunitiesAlert').classList.add('hidden');
+            }
+        }
+
+        function showOpportunitiesAlert(opportunities) {
+            const container = document.getElementById('opportunitiesList');
+            const alert = document.getElementById('opportunitiesAlert');
+            
+            container.innerHTML = opportunities.map(opp => {
+                let timeInfo = '';
+                if (opp.opportunityType === 'first-come-first-serve') {
+                    timeInfo = '<span class="text-red-400 font-bold">First Come, First Serve!</span>';
+                } else if (opp.opportunityDeadline) {
+                    const deadline = new Date(opp.opportunityDeadline);
+                    const hours = Math.round((deadline - new Date()) / 3600000);
+                    timeInfo = `<span class="text-orange-400 font-bold">Noch ${hours} Stunden!</span>`;
+                }
+                
+                return `
+                    <div class="glass-effect rounded-lg p-4 border-2 border-orange-400">
+                        <div class="flex justify-between items-start">
+                            <div class="flex-1">
+                                <div class="font-bold text-lg mb-1">${opp.subject}</div>
+                                <div class="text-sm text-gray-300 mb-2">${opp.snippet}</div>
+                                <div class="text-sm">${timeInfo}</div>
+                            </div>
+                            <button onclick="openEmail('${opp.id}')" class="btn-primary text-xs">
+                                Öffnen
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            alert.classList.remove('hidden');
+        }
+
+        // ==================== EMAIL SEARCH & FILTER ====================
+        function searchEmails() {
+            emailSearchQuery = document.getElementById('emailSearchInput').value.toLowerCase();
+            renderEmailViews();
+        }
+        
+        function filterByCategory(category) {
+            emailCategoryFilter = category;
+            
+            // Update button states
+            ['all', 'academic', 'activities', 'administrative', 'social', 'opportunities', 'personal'].forEach(cat => {
+                const btn = document.getElementById(`cat-${cat}`);
+                if (btn) {
+                    if (cat === category) {
+                        btn.classList.remove('bg-white/10');
+                        btn.classList.add('bg-cyan-500', 'text-black');
+                    } else {
+                        btn.classList.remove('bg-cyan-500', 'text-black');
+                        btn.classList.add('bg-white/10');
+                    }
+                }
+            });
+            
+            renderEmailViews();
+        }
+        
+        function getFilteredEmails() {
+            let emails = [...window.appData.emails];
+            
+            // Apply category filter
+            if (emailCategoryFilter !== 'all') {
+                emails = emails.filter(e => e.category === emailCategoryFilter);
+            }
+            
+            // Apply search filter
+            if (emailSearchQuery) {
+                emails = emails.filter(e => 
+                    e.from.toLowerCase().includes(emailSearchQuery) ||
+                    e.subject.toLowerCase().includes(emailSearchQuery) ||
+                    e.content.toLowerCase().includes(emailSearchQuery) ||
+                    e.snippet.toLowerCase().includes(emailSearchQuery)
+                );
+            }
+            
+            return emails;
+        }
+
+        // ==================== EMAIL VIEWS ====================
+        function showEmailView(view) {
+            currentEmailView = view;
+            ['archives', 'account', 'sender', 'date', 'category'].forEach(v => {
+                const btn = document.getElementById(`view-${v}`);
+                if (btn) {
+                    if (v === view) {
+                        btn.classList.remove('bg-white/5', 'hover:bg-white/10');
+                        btn.classList.add('btn-primary');
+                    } else {
+                        btn.classList.remove('btn-primary');
+                        btn.classList.add('bg-white/5', 'hover:bg-white/10');
+                    }
+                }
+            });
+            renderEmailViews();
+        }
+
+        function renderEmailViews() {
+            const container = document.getElementById('emailViewContainer');
+            
+            switch(currentEmailView) {
+                case 'archives':
+                    renderArchivesView(container);
+                    break;
+                case 'account':
+                    renderAccountView(container);
+                    break;
+                case 'sender':
+                    renderSenderView(container);
+                    break;
+                case 'date':
+                    renderDateView(container);
+                    break;
+                case 'category':
+                    renderCategoryView(container);
+                    break;
+            }
+        }
+
+        function renderArchivesView(container) {
+            const emailsByDay = {};
+            const filteredEmails = getFilteredEmails();
+            
+            filteredEmails.forEach(email => {
+                const date = new Date(email.date).toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: '2-digit', 
+                    day: '2-digit' 
+                });
+                if (!emailsByDay[date]) emailsByDay[date] = [];
+                emailsByDay[date].push(email);
+            });
+            
+            const sortedDays = Object.keys(emailsByDay).sort((a, b) => 
+                new Date(b) - new Date(a)
+            );
+            
+            if (sortedDays.length === 0) {
+                container.innerHTML = '<p class="text-gray-400">No emails found matching your filters</p>';
+                return;
+            }
+            
+            container.innerHTML = sortedDays.map(day => {
+                const dayEmails = emailsByDay[day];
+                const unreadCount = dayEmails.filter(e => !e.read).length;
+                const importantCount = dayEmails.filter(e => e.important).length;
+                const opportunityCount = dayEmails.filter(e => e.hasOpportunity).length;
+                
+                return `
+                    <div class="glass-effect rounded-lg p-4 mb-3 hover:bg-white/10 cursor-pointer transition-all" 
+                         onclick="showDailyArchive('${day}')">
+                        <div class="flex justify-between items-center">
+                            <div class="flex-1">
+                                <h3 class="text-xl font-bold font-mono mb-2" style="color: var(--primary);">
+                                    📅 ${new Date(day).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                                </h3>
+                                <div class="flex gap-4 text-sm text-gray-400">
+                                    <span>${dayEmails.length} email${dayEmails.length !== 1 ? 's' : ''}</span>
+                                    ${unreadCount > 0 ? `<span class="text-orange-400">${unreadCount} unread</span>` : ''}
+                                    ${importantCount > 0 ? `<span class="text-red-400">${importantCount} important</span>` : ''}
+                                    ${opportunityCount > 0 ? `<span class="text-yellow-400">${opportunityCount} opportunities</span>` : ''}
+                                </div>
+                            </div>
+                            <div class="text-3xl">→</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function showDailyArchive(day) {
+            const dayEmails = window.appData.emails.filter(email => {
+                const emailDate = new Date(email.date).toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: '2-digit', 
+                    day: '2-digit' 
+                });
+                return emailDate === day;
+            });
+            
+            const container = document.getElementById('emailViewContainer');
+            
+            container.innerHTML = `
+                <div class="mb-4">
+                    <button onclick="renderEmailViews()" class="text-sm text-gray-400 hover:text-white mb-4">
+                        ← Back to Archives
+                    </button>
+                    <h3 class="text-2xl font-bold font-mono mb-4" style="color: var(--primary);">
+                        ${new Date(day).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                    </h3>
+                </div>
+                <div class="space-y-2">
+                    ${renderEmailList(dayEmails)}
+                </div>
+            `;
+        }
+        
+        function renderAccountView(container) {
+            const emailsByAccount = {};
+            const filteredEmails = getFilteredEmails();
+            
+            // Group emails by recipient account (demo: extract from 'to' field or use a default)
+            filteredEmails.forEach(email => {
+                // In a real implementation, this would be the email account that received the email
+                // For demo, we'll extract domain or use a placeholder
+                const account = email.account || 'main@example.com';
+                if (!emailsByAccount[account]) emailsByAccount[account] = [];
+                emailsByAccount[account].push(email);
+            });
+            
+            const sortedAccounts = Object.keys(emailsByAccount).sort();
+            
+            if (sortedAccounts.length === 0) {
+                container.innerHTML = '<p class="text-gray-400">No emails found matching your filters</p>';
+                return;
+            }
+            
+            container.innerHTML = sortedAccounts.map(account => `
+                <div class="mb-6">
+                    <h3 class="text-xl font-bold mb-3 font-mono" style="color: var(--primary);">📬 ${account}</h3>
+                    <div class="text-sm text-gray-400 mb-3">${emailsByAccount[account].length} email${emailsByAccount[account].length !== 1 ? 's' : ''}</div>
+                    <div class="space-y-2">
+                        ${renderEmailList(emailsByAccount[account])}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderSenderView(container) {
+            const emailsBySender = {};
+            const filteredEmails = getFilteredEmails();
+            
+            filteredEmails.forEach(email => {
+                if (!emailsBySender[email.from]) emailsBySender[email.from] = [];
+                emailsBySender[email.from].push(email);
+            });
+            
+            const sortedSenders = Object.keys(emailsBySender).sort();
+            
+            if (sortedSenders.length === 0) {
+                container.innerHTML = '<p class="text-gray-400">No emails found matching your filters</p>';
+                return;
+            }
+            
+            container.innerHTML = sortedSenders.map(sender => `
+                <div class="mb-6">
+                    <h3 class="text-xl font-bold mb-3 font-mono" style="color: var(--primary);">👤 ${sender}</h3>
+                    <div class="space-y-2">
+                        ${renderEmailList(emailsBySender[sender])}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderDateView(container) {
+            const filteredEmails = getFilteredEmails();
+            const sorted = [...filteredEmails].sort((a, b) => 
+                new Date(b.date) - new Date(a.date)
+            );
+            
+            if (sorted.length === 0) {
+                container.innerHTML = '<p class="text-gray-400">No emails found matching your filters</p>';
+                return;
+            }
+            
+            container.innerHTML = `
+                <div class="space-y-2">
+                    ${renderEmailList(sorted)}
+                </div>
+            `;
+        }
+
+        function renderCategoryView(container) {
+            const emailsByCategory = {};
+            const filteredEmails = getFilteredEmails();
+            
+            Object.keys(EMAIL_CATEGORIES).forEach(cat => {
+                emailsByCategory[cat] = filteredEmails.filter(e => e.category === cat);
+            });
+            
+            const hasEmails = Object.values(emailsByCategory).some(arr => arr.length > 0);
+            
+            if (!hasEmails) {
+                container.innerHTML = '<p class="text-gray-400">No emails found matching your filters</p>';
+                return;
+            }
+            
+            container.innerHTML = Object.keys(emailsByCategory)
+                .filter(cat => emailsByCategory[cat].length > 0)
+                .map(cat => `
+                    <div class="mb-6">
+                        <h3 class="text-xl font-bold mb-3 font-mono" style="color: var(--primary);">
+                            ${getCategoryIcon(cat)} ${getCategoryName(cat)} (${emailsByCategory[cat].length})
+                        </h3>
+                        <div class="space-y-2">
+                            ${renderEmailList(emailsByCategory[cat])}
+                        </div>
+                    </div>
+                `).join('');
+        }
+
+        function renderEmailList(emails) {
+            return emails.map(email => {
+                const isSelected = selectedEmails.has(email.id);
+                return `
+                    <div class="email-card glass-effect rounded-lg p-4 ${email.read ? '' : 'email-unread'} ${email.important ? 'email-important' : ''} 
+                         ${isSelected ? 'border-2 border-cyan-400' : ''}">
+                        <div class="flex items-start gap-3">
+                            <input type="checkbox" ${isSelected ? 'checked' : ''} 
+                                   onchange="toggleEmailSelection('${email.id}')"
+                                   class="mt-1 w-5 h-5 cursor-pointer">
+                            <div class="flex-1" onclick="openEmail('${email.id}')">
+                                <div class="flex justify-between items-start mb-2">
+                                    <div>
+                                        <div class="font-bold font-mono text-sm text-gray-400">${email.from}</div>
+                                        <div class="font-semibold text-lg">${email.subject}</div>
+                                    </div>
+                                    <div class="flex gap-2 items-center">
+                                        ${email.important ? '<span class="text-red-400">⭐</span>' : ''}
+                                        ${!email.read ? '<span class="text-orange-400 text-xs font-bold">NEU</span>' : ''}
+                                    </div>
+                                </div>
+                                <div class="text-sm text-gray-400 mb-2">${email.snippet}</div>
+                                <div class="flex gap-2">
+                                    <span class="category-badge text-xs">${getCategoryIcon(email.category)} ${getCategoryName(email.category)}</span>
+                                    <span class="text-xs text-gray-500">${new Date(email.date).toLocaleString('en-US')}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function toggleEmailSelection(emailId) {
+            if (selectedEmails.has(emailId)) {
+                selectedEmails.delete(emailId);
+            } else {
+                selectedEmails.add(emailId);
+            }
+            updateSelectedEmailsInfo();
+            renderEmailViews();
+        }
+
+        function updateSelectedEmailsInfo() {
+            const count = selectedEmails.size;
+            const info = document.getElementById('selectedEmailsInfo');
+            info.textContent = count > 0 ? `${count} email(s) selected` : 'Select emails to perform actions';
+        }
+
+        async function bulkAction(action) {
+            if (selectedEmails.size === 0) {
+                alert('Please select at least one email!');
+                return;
+            }
+            
+            const emails = Array.from(selectedEmails).map(id => 
+                window.appData.emails.find(e => e.id === id)
+            );
+            
+            switch(action) {
+                case 'draft':
+                    await bulkDraftReplies(emails);
+                    break;
+                case 'extract':
+                    await bulkExtractTasks(emails);
+                    break;
+                case 'important':
+                    bulkMarkImportant(emails);
+                    break;
+            }
+        }
+
+        async function bulkDraftReplies(emails) {
+            alert('🤖 Drafting replies for ' + emails.length + ' email(s)...');
+            
+            for (const email of emails) {
+                try {
+                    const response = await fetch("https://api.anthropic.com/v1/messages", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            model: "claude-sonnet-4-20250514",
+                            max_tokens: 1000,
+                            messages: [{
+                                role: "user",
+                                content: `Draft a professional reply to this email in ${email.language === 'de' ? 'German' : 'English'}:
+
+From: ${email.from}
+Subject: ${email.subject}
+Content: ${email.content}
+
+Keep the same language as the original email.`
+                            }]
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    const reply = data.content.find(c => c.type === 'text')?.text || 'No reply generated';
+                    
+                    // Add to notifications
+                    addNotification({
+                        id: `draft-${email.id}-${Date.now()}`,
+                        type: 'draft',
+                        title: '✍️ Reply Draft Ready',
+                        message: `For: ${email.subject}`,
+                        content: reply,
+                        timestamp: new Date().toISOString()
+                    });
+                } catch (error) {
+                    console.error('Error drafting reply:', error);
+                }
+            }
+            
+            selectedEmails.clear();
+            updateSelectedEmailsInfo();
+            renderEmailViews();
+            alert('✅ Replies created! Check notifications.');
+        }
+
+        async function bulkExtractTasks(emails) {
+            alert('📋 Extracting tasks from ' + emails.length + ' email(s)...');
+            
+            for (const email of emails) {
+                try {
+                    const response = await fetch("https://api.anthropic.com/v1/messages", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            model: "claude-sonnet-4-20250514",
+                            max_tokens: 1000,
+                            messages: [{
+                                role: "user",
+                                content: `Extract all tasks, action items, and deadlines from this email. Return ONLY a JSON array of tasks with this structure:
+[{"title": "task name", "deadline": "YYYY-MM-DD", "priority": "high/medium/low", "notes": "details"}]
+
+Email:
+From: ${email.from}
+Subject: ${email.subject}
+Content: ${email.content}`
+                            }]
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    const text = data.content.find(c => c.type === 'text')?.text || '[]';
+                    const cleanText = text.replace(/```json|```/g, '').trim();
+                    const extractedTasks = JSON.parse(cleanText);
+                    
+                    extractedTasks.forEach(task => {
+                        window.appData.tasks.push({
+                            id: Date.now() + Math.random(),
+                            title: task.title,
+                            deadline: task.deadline,
+                            deadlineTime: '',
+                            priority: task.priority || 'medium',
+                            category: 'From Email',
+                            notes: task.notes + `\n\nSource: ${email.subject}`,
+                            completed: false,
+                            reminder: null,
+                            createdAt: new Date().toISOString()
+                        });
+                    });
+                    
+                    await saveData();
+                } catch (error) {
+                    console.error('Error extracting tasks:', error);
+                }
+            }
+            
+            selectedEmails.clear();
+            updateSelectedEmailsInfo();
+            renderEmailViews();
+            renderTasks();
+            alert('✅ Tasks extracted and added to task list!');
+        }
+
+        function bulkMarkImportant(emails) {
+            emails.forEach(email => {
+                email.important = !email.important;
+            });
+            saveData();
+            selectedEmails.clear();
+            updateSelectedEmailsInfo();
+            renderEmailViews();
+            renderDashboard();
+        }
+
+        // ==================== TASKS ====================
+        async function addTask() {
+            const title = document.getElementById('taskTitle').value.trim();
+            if (!title) {
+                alert('Please enter a title!');
+                return;
+            }
+            
+            const date = document.getElementById('taskDeadlineDate').value;
+            const time = document.getElementById('taskDeadlineTime').value;
+            const deadline = date ? `${date}${time ? 'T' + time : ''}` : null;
+            
+            const task = {
+                id: Date.now(),
+                title,
+                deadline,
+                deadlineTime: time,
+                priority: document.getElementById('taskPriority').value,
+                category: document.getElementById('taskCategory').value || 'General',
+                notes: document.getElementById('taskNotes').value,
+                reminder: parseInt(document.getElementById('taskReminder').value) || null,
+                completed: false,
+                createdAt: new Date().toISOString()
+            };
+            
+            window.appData.tasks.push(task);
+            await saveData();
+            
+            // Clear form
+            document.getElementById('taskTitle').value = '';
+            document.getElementById('taskDeadlineDate').value = '';
+            document.getElementById('taskDeadlineTime').value = '';
+            document.getElementById('taskPriority').value = 'medium';
+            document.getElementById('taskCategory').value = '';
+            document.getElementById('taskNotes').value = '';
+            document.getElementById('taskReminder').value = '';
+            
+            renderTasks();
+            renderMiniCalendar();
+            updateStats();
+            
+            // Schedule reminder
+            if (task.reminder && task.deadline) {
+                scheduleReminder(task);
+            }
+        }
+
+        function filterTasks(filter) {
+            currentTaskFilter = filter;
+            ['all', 'active', 'completed'].forEach(f => {
+                const btn = document.getElementById(`filter-${f}`);
+                if (f === filter) {
+                    btn.classList.remove('bg-white/5');
+                    btn.classList.add('btn-primary');
+                } else {
+                    btn.classList.remove('btn-primary');
+                    btn.classList.add('bg-white/5');
+                }
+            });
+            renderTasks();
+        }
+
+        function renderTasks() {
+            const container = document.getElementById('tasksList');
+            let tasks = window.appData.tasks;
+            
+            if (currentTaskFilter === 'active') {
+                tasks = tasks.filter(t => !t.completed);
+            } else if (currentTaskFilter === 'completed') {
+                tasks = tasks.filter(t => t.completed);
+            }
+            
+            if (tasks.length === 0) {
+                container.innerHTML = '<p class="text-gray-400">No tasks found.</p>';
+                return;
+            }
+            
+            tasks.sort((a, b) => {
+                if (!a.deadline) return 1;
+                if (!b.deadline) return -1;
+                return new Date(a.deadline) - new Date(b.deadline);
+            });
+            
+            container.innerHTML = tasks.map(task => {
+                const deadlineStr = task.deadline ? new Date(task.deadline).toLocaleString('en-US', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    ...(task.deadlineTime ? { hour: '2-digit', minute: '2-digit' } : {})
+                }) : 'No date';
+                
+                return `
+                    <div class="glass-effect rounded-lg p-4 priority-${task.priority} ${task.completed ? 'opacity-50' : ''}">
+                        <div class="flex items-start gap-3">
+                            <input type="checkbox" ${task.completed ? 'checked' : ''} 
+                                   onchange="toggleTask(${task.id})"
+                                   class="mt-1 w-5 h-5 cursor-pointer">
+                            <div class="flex-1">
+                                <div class="flex justify-between items-start">
+                                    <h4 class="font-bold text-lg ${task.completed ? 'line-through' : ''}">${task.title}</h4>
+                                    <button onclick="deleteTask(${task.id})" class="text-red-400 hover:text-red-300 text-xl">
+                                        🗑️
+                                    </button>
+                                </div>
+                                <div class="flex gap-2 mt-2 text-sm">
+                                    <span class="category-badge text-xs">${task.category}</span>
+                                    <span class="text-gray-400">📅 ${deadlineStr}</span>
+                                    ${task.reminder ? `<span class="text-gray-400">⏰ ${task.reminder}min vorher</span>` : ''}
+                                </div>
+                                ${task.notes ? `<p class="text-sm mt-2 text-gray-300">${task.notes}</p>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            updateUpcomingDeadlines();
+        }
+
+        async function toggleTask(id) {
+            const task = window.appData.tasks.find(t => t.id === id);
+            if (task) {
+                task.completed = !task.completed;
+                await saveData();
+                renderTasks();
+                updateStats();
+            }
+        }
+
+        async function deleteTask(id) {
+            if (confirm('Really delete task?')) {
+                window.appData.tasks = window.appData.tasks.filter(t => t.id !== id);
+                await saveData();
+                renderTasks();
+                renderMiniCalendar();
+                updateStats();
+            }
+        }
+
+        function renderMiniCalendar() {
+            const today = new Date();
+            
+            const firstDay = new Date(calendarYear, calendarMonth, 1);
+            const lastDay = new Date(calendarYear, calendarMonth + 1, 0);
+            const daysInMonth = lastDay.getDate();
+            const startDay = firstDay.getDay();
+            
+            const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                              'July', 'August', 'September', 'October', 'November', 'December'];
+            
+            let html = `
+                <div class="flex justify-between items-center mb-3">
+                    <button onclick="prevMonth()" class="text-xl hover:text-cyan-400 transition-colors">←</button>
+                    <div class="text-center font-bold font-mono" style="color: var(--primary);">
+                        ${monthNames[calendarMonth]} ${calendarYear}
+                    </div>
+                    <button onclick="nextMonth()" class="text-xl hover:text-cyan-400 transition-colors">→</button>
+                </div>
+                <div class="grid grid-cols-7 gap-1 text-center text-sm">
+            `;
+            
+            ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].forEach(day => {
+                html += `<div class="font-semibold text-gray-400 font-mono">${day}</div>`;
+            });
+            
+            for (let i = 0; i < startDay; i++) {
+                html += '<div></div>';
+            }
+            
+            for (let day = 1; day <= daysInMonth; day++) {
+                const date = new Date(calendarYear, calendarMonth, day);
+                const isToday = date.toDateString() === today.toDateString();
+                const dateStr = date.toISOString().split('T')[0];
+                const tasksForDay = window.appData.tasks.filter(t => 
+                    t.deadline && t.deadline.startsWith(dateStr) && !t.completed
+                );
+                const hasTasks = tasksForDay.length > 0;
+                
+                html += `<div class="calendar-day ${isToday ? 'calendar-today' : ''} ${hasTasks ? 'calendar-has-tasks' : ''}" 
+                         onclick="showTasksForDay('${dateStr}')">
+                    ${day}
+                </div>`;
+            }
+            
+            html += '</div>';
+            document.getElementById('miniCalendar').innerHTML = html;
+        }
+        
+        function prevMonth() {
+            calendarMonth--;
+            if (calendarMonth < 0) {
+                calendarMonth = 11;
+                calendarYear--;
+            }
+            renderMiniCalendar();
+        }
+        
+        function nextMonth() {
+            calendarMonth++;
+            if (calendarMonth > 11) {
+                calendarMonth = 0;
+                calendarYear++;
+            }
+            renderMiniCalendar();
+        }
+        
+        function showTasksForDay(dateStr) {
+            const tasksForDay = window.appData.tasks.filter(t => 
+                t.deadline && t.deadline.startsWith(dateStr)
+            );
+            
+            if (tasksForDay.length === 0) {
+                alert('No tasks scheduled for this day');
+                return;
+            }
+            
+            const date = new Date(dateStr);
+            const formattedDate = date.toLocaleDateString('en-US', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            });
+            
+            const modal = document.getElementById('emailViewerModal');
+            const content = document.getElementById('emailViewerContent');
+            
+            content.innerHTML = `
+                <div class="space-y-4">
+                    <h3 class="text-2xl font-bold mb-4">Tasks for ${formattedDate}</h3>
+                    <div class="space-y-3">
+                        ${tasksForDay.map(task => {
+                            const deadlineStr = task.deadline ? new Date(task.deadline).toLocaleString('en-US', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                ...(task.deadlineTime ? {} : { hour: undefined, minute: undefined })
+                            }) : '';
+                            
+                            return `
+                                <div class="glass-effect rounded-lg p-4 priority-${task.priority} ${task.completed ? 'opacity-50' : ''}">
+                                    <div class="flex items-start gap-3">
+                                        <input type="checkbox" ${task.completed ? 'checked' : ''} 
+                                               onchange="toggleTaskInModal(${task.id})"
+                                               class="mt-1 w-5 h-5 cursor-pointer">
+                                        <div class="flex-1">
+                                            <div class="flex justify-between items-start">
+                                                <h4 class="font-bold text-lg ${task.completed ? 'line-through' : ''}">${task.title}</h4>
+                                            </div>
+                                            <div class="flex gap-2 mt-2 text-sm">
+                                                <span class="category-badge text-xs">${task.category}</span>
+                                                ${task.deadlineTime ? `<span class="text-gray-400">⏰ ${task.deadlineTime}</span>` : ''}
+                                                ${task.reminder ? `<span class="text-gray-400">🔔 ${task.reminder}min before</span>` : ''}
+                                            </div>
+                                            ${task.notes ? `<p class="text-sm mt-2 text-gray-300">${task.notes}</p>` : ''}
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                    <div class="flex gap-3 pt-4 border-t border-white/10">
+                        <button onclick="closeEmailViewer()" class="btn-primary text-sm">
+                            ← Back to Calendar
+                        </button>
+                        <button onclick="closeEmailViewer(); switchTab('tasks');" class="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-sm font-mono">
+                            Go to Tasks Tab
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            modal.classList.remove('hidden');
+        }
+        
+        async function toggleTaskInModal(id) {
+            const task = window.appData.tasks.find(t => t.id === id);
+            if (task) {
+                task.completed = !task.completed;
+                await saveData();
+                // Re-render the modal with updated task
+                const dateStr = task.deadline.split('T')[0];
+                showTasksForDay(dateStr);
+                renderTasks();
+                renderMiniCalendar();
+                updateStats();
+            }
+        }
+
+        function updateUpcomingDeadlines() {
+            const today = new Date();
+            const upcoming = window.appData.tasks
+                .filter(t => !t.completed && t.deadline)
+                .map(t => ({...t, deadlineDate: new Date(t.deadline)}))
+                .filter(t => t.deadlineDate >= today)
+                .sort((a, b) => a.deadlineDate - b.deadlineDate)
+                .slice(0, 5);
+            
+            const container = document.getElementById('upcomingDeadlines');
+            
+            if (upcoming.length === 0) {
+                container.innerHTML = '<p class="text-sm text-gray-400">No upcoming deadlines</p>';
+                return;
+            }
+            
+            container.innerHTML = upcoming.map(t => {
+                const hours = Math.ceil((t.deadlineDate - today) / 3600000);
+                const days = Math.ceil(hours / 24);
+                let timeText = '';
+                let colorClass = 'text-gray-300';
+                
+                if (hours < 24) {
+                    timeText = hours === 1 ? 'In 1 hour!' : `In ${hours} hours`;
+                    colorClass = 'text-red-400 font-bold';
+                } else if (days === 1) {
+                    timeText = 'Tomorrow';
+                    colorClass = 'text-orange-400';
+                } else {
+                    timeText = `In ${days} days`;
+                }
+                
+                return `
+                    <div class="glass-effect rounded-lg p-3 mb-2">
+                        <div class="font-semibold text-sm">${t.title}</div>
+                        <div class="text-xs ${colorClass}">${timeText}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // ==================== REMINDER SYSTEM ====================
+        function startReminderSystem() {
+            // Check reminders every minute
+            setInterval(checkReminders, 60000);
+            checkReminders(); // Initial check
+        }
+
+        function checkReminders() {
+            const now = new Date();
+            
+            window.appData.tasks.forEach(task => {
+                if (!task.completed && task.deadline && task.reminder) {
+                    const deadline = new Date(task.deadline);
+                    const reminderTime = new Date(deadline - task.reminder * 60000);
+                    
+                    if (now >= reminderTime && now < deadline) {
+                        const notifId = `reminder-${task.id}`;
+                        if (!window.appData.notifications.find(n => n.id === notifId)) {
+                            addNotification({
+                                id: notifId,
+                                type: 'reminder',
+                                title: '⏰ Reminder',
+                                message: `${task.title} - in ${task.reminder} minutes!`,
+                                timestamp: new Date().toISOString()
+                            });
+                            
+                            // Browser notification
+                            if ('Notification' in window && Notification.permission === 'granted') {
+                                new Notification('ProFlow Reminder', {
+                                    body: `${task.title} - in ${task.reminder} minutes!`,
+                                    icon: '⏰'
+                                });
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function scheduleReminder(task) {
+            if ('Notification' in window && Notification.permission === 'default') {
+                Notification.requestPermission();
+            }
+        }
+
+        // ==================== NOTIFICATIONS ====================
+        function addNotification(notification) {
+            window.appData.notifications.unshift(notification);
+            saveData();
+            updateNotificationBadge();
+        }
+
+        function updateNotificationBadge() {
+            const badge = document.getElementById('notificationBadge');
+            const count = window.appData.notifications.length;
+            
+            if (count > 0) {
+                badge.textContent = count;
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+
+        function showNotifications() {
+            const modal = document.getElementById('notificationModal');
+            const list = document.getElementById('notificationsList');
+            
+            if (window.appData.notifications.length === 0) {
+                list.innerHTML = '<p class="text-gray-400 text-center py-8">No notifications</p>';
+            } else {
+                list.innerHTML = window.appData.notifications.map((notif, index) => `
+                    <div class="glass-effect rounded-lg p-4 mb-3">
+                        <div class="flex justify-between items-start">
+                            <div class="flex-1">
+                                <div class="font-bold mb-1">${notif.title}</div>
+                                <div class="text-sm text-gray-300">${notif.message}</div>
+                                ${notif.content ? `<div class="mt-2 p-3 bg-white/5 rounded text-sm">${notif.content}</div>` : ''}
+                                <div class="text-xs text-gray-500 mt-2">${new Date(notif.timestamp).toLocaleString('de-DE')}</div>
+                            </div>
+                            <button onclick="deleteNotification(${index})" class="text-red-400 hover:text-red-300">
+                                ×
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+            
+            modal.classList.remove('hidden');
+        }
+
+        function closeNotifications() {
+            document.getElementById('notificationModal').classList.add('hidden');
+        }
+
+        function deleteNotification(index) {
+            window.appData.notifications.splice(index, 1);
+            saveData();
+            updateNotificationBadge();
+            showNotifications();
+        }
+
+        // ==================== IDEAS ====================
+        function formatText(command) {
+            document.execCommand(command, false, null);
+            document.getElementById('ideaContent').focus();
+        }
+
+        async function saveIdea() {
+            const title = document.getElementById('ideaTitle').value.trim();
+            const content = document.getElementById('ideaContent').innerHTML.trim();
+            const category = document.getElementById('ideaCategory').value;
+            
+            if (!title || !content) {
+                alert('Please enter title and content!');
+                return;
+            }
+            
+            const idea = {
+                id: Date.now(),
+                title,
+                content,
+                category: category || 'notiz',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            };
+            
+            window.appData.ideas.push(idea);
+            await saveData();
+            
+            document.getElementById('ideaTitle').value = '';
+            document.getElementById('ideaContent').innerHTML = '';
+            document.getElementById('ideaCategory').value = '';
+            
+            renderIdeas();
+            alert('Idea saved! ✅');
+        }
+
+        function filterIdeas(filter) {
+            currentIdeaFilter = filter;
+            ['all', 'projekt', 'idee', 'notiz'].forEach(f => {
+                const btn = document.getElementById(`idea-filter-${f}`);
+                if (btn) {
+                    if (f === filter) {
+                        btn.classList.remove('bg-white/5');
+                        btn.classList.add('btn-primary');
+                    } else {
+                        btn.classList.remove('btn-primary');
+                        btn.classList.add('bg-white/5');
+                    }
+                }
+            });
+            renderIdeas();
+        }
+
+        function renderIdeas() {
+            const container = document.getElementById('ideasList');
+            let ideas = window.appData.ideas;
+            
+            if (currentIdeaFilter !== 'all') {
+                ideas = ideas.filter(i => i.category === currentIdeaFilter);
+            }
+            
+            if (ideas.length === 0) {
+                container.innerHTML = '<p class="text-gray-400 col-span-2">No ideas saved yet.</p>';
+                return;
+            }
+            
+            ideas.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+            
+            const categoryIcons = {
+                projekt: '🚀',
+                idee: '💡',
+                notiz: '📝',
+                recherche: '🔍'
+            };
+            
+            container.innerHTML = ideas.map(idea => `
+                <div class="glass-effect rounded-lg p-4">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <span class="text-2xl">${categoryIcons[idea.category] || '📄'}</span>
+                            <h4 class="font-bold inline-block ml-2">${idea.title}</h4>
+                        </div>
+                        <button onclick="deleteIdea(${idea.id})" class="text-red-400 hover:text-red-300">
+                            🗑️
+                        </button>
+                    </div>
+                    <div class="text-sm text-gray-400 mb-2">
+                        ${new Date(idea.createdAt).toLocaleDateString('de-DE')}
+                    </div>
+                    <details class="text-sm">
+                        <summary class="cursor-pointer font-mono" style="color: var(--primary);">Show content</summary>
+                        <div class="mt-2 p-3 bg-white/5 rounded prose prose-sm max-w-none text-gray-300">${idea.content}</div>
+                    </details>
+                </div>
+            `).join('');
+        }
+
+        async function deleteIdea(id) {
+            if (confirm('Really delete idea?')) {
+                window.appData.ideas = window.appData.ideas.filter(i => i.id !== id);
+                await saveData();
+                renderIdeas();
+            }
+        }
+
+        // ==================== AUTO-CATEGORIZATION ====================
+        function categorizeEmail(email) {
+            const text = `${email.subject} ${email.content}`.toLowerCase();
+            
+            for (const [category, keywords] of Object.entries(EMAIL_CATEGORIES)) {
+                if (category === 'other') continue;
+                if (keywords.some(keyword => text.includes(keyword))) {
+                    return category;
+                }
+            }
+            
+            return 'other';
+        }
+
+        // Initialize app
+        initApp();
+        
+        // Request notification permission
+        if ('Notification' in window && Notification.permission === 'default') {
+            Notification.requestPermission();
+        }
+    </script>
+</body>
+</html>
